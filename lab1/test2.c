@@ -31,6 +31,6 @@ writer(void *arg)
     printf("Doing WriteTerminal... '");
     fflush(stdout);
     status = WriteTerminal(1, string, length);
-    printf("'. Done: status = %d.\n", length);
+    printf("'. Done: status = %d.\n", status);
     fflush(stdout);
 }
