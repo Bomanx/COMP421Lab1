@@ -19,6 +19,9 @@ static int state[MAX_NUM_TERMINALS];
 #define	READING		1
 #define	WRITING		2
 #define ECHOING     3
+
+static cond_id_t cond_var[MAX_NUM_TERMINALS];
+
 static int echoBufferLength[MAX_NUM_TERMINALS];
 static int echoItemsLeft[MAX_NUM_TERMINALS];
 static char echoBuffer[MAX_NUM_TERMINALS][MAX_ECHO_BUFFER_LENGTH];
@@ -64,7 +67,12 @@ extern int WriteTerminal(int term, char *buf, int buflen) {
 		writeBufferSpot[term]++;
 		WriteDataRegister(term, reg_char);
 	}
-	return buflen;
+	if (writeItemsLeft[term] == 0) {
+		return buflen;
+	}
+	else {
+		CondWait(cond_var[term]);
+	}
 }
 
 /*
@@ -78,7 +86,7 @@ extern int WriteTerminal(int term, char *buf, int buflen) {
 extern int ReadTerminal(int term, char *buf, int buflen) {
 	Declare_Monitor_Entry_Procedure();
 	printf("Reading terminal %d\n", term);
-	if (buflen > 0) {
+	if (buflen >= 0) {
 		// state[term] = READING;
 		terminalItemsWrittenSoFar[term] = 0;
 		while (1) {
@@ -95,6 +103,9 @@ extern int ReadTerminal(int term, char *buf, int buflen) {
 					buf[terminalItemsWrittenSoFar[term]] = reg_char;
 					terminalItemsWrittenSoFar[term]++;
 				}
+			}
+			else {
+				CondWait(cond_var[term]);
 			}
 			if (terminalItemsWrittenSoFar[term] == buflen || reg_char == '\n') {
 				return terminalItemsWrittenSoFar[term];
@@ -128,6 +139,8 @@ int InitTerminal(int term) {
     terminalItemsWrittenSoFar[term] = 0;
     InitHardware(term);
 
+    cond_var[term] = CondCreate();
+
 	return 0;
 }
 
@@ -155,7 +168,7 @@ int InitTerminalDriver(void) {
  * of the terminal.
  */
 void TransmitInterrupt(int term) {
-	// Declare_Monitor_Entry_Procedure();
+	Declare_Monitor_Entry_Procedure();
 	printf("TransmitInturrupt\n");
 	char reg_char = 0;
 
@@ -178,6 +191,7 @@ void TransmitInterrupt(int term) {
 	}
 	else {
 		state[term] = SITTING;
+		CondSignal(cond_var[term]);
 	}
 		
 
@@ -189,7 +203,7 @@ void TransmitInterrupt(int term) {
  * data register 
  */
 void ReceiveInterrupt(int term) {
-	// Declare_Monitor_Entry_Procedure();
+	Declare_Monitor_Entry_Procedure();
 	printf("RecieveInturrupt %d\n", term);
 	char reg_char = ReadDataRegister(term);
 	echoBuffer[term][echoBufferLength[term] % MAX_ECHO_BUFFER_LENGTH] = reg_char;
