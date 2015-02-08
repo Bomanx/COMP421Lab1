@@ -6,6 +6,8 @@
 #include <hardware.h>
 void writer(void *);
 void writer2(void *);
+void reader(void *);
+void reader2(void *);
 
 char string[] = "abcdefghijklmnopqrstuvwxyz";
 int length = sizeof(string) - 1;
@@ -23,7 +25,9 @@ int main(int argc, char **argv)
 
     while(1) {
         ThreadCreate(writer, NULL);
+        ThreadCreate(reader, NULL);
         ThreadCreate(writer2, NULL);
+        // ThreadCreate(reader2, NULL);
         sleep(3);
     }
     ThreadWaitAll();
@@ -39,7 +43,9 @@ writer(void *arg)
     printf("Doing WriteTerminal... '");
     fflush(stdout);
     status = WriteTerminal(1, string, length);
-    printf("'. Done: status = %d.\n", status);
+    char* str = malloc(3);
+    // status = ReadTerminal(1, str,3);
+    printf("'. Done: status = %d.\n %s\n", status, str);
     fflush(stdout);
 }
 
@@ -50,7 +56,32 @@ writer2(void *arg)
 
     printf("Doing WriteTerminal... '");
     fflush(stdout);
-    status = WriteTerminal(2, string, length);
+    status = WriteTerminal(2, "foofoofoo",9);
     printf("'. Done: status = %d.\n", status);
+    fflush(stdout);
+}
+
+void
+reader(void *arg)
+{
+    int status;
+
+    printf("Doing ReadTerminal... '");
+    fflush(stdout);
+    char* str = malloc(3);
+    status = ReadTerminal(1, str,3);
+    printf("'. Done: status = %d.\n %s\n", status, str);
+    fflush(stdout);
+}
+void
+reader2(void *arg)
+{
+    int status;
+
+    printf("Doing ReadTerminal... '");
+    fflush(stdout);
+    char* str = malloc(3);
+    status = ReadTerminal(2, str,3);
+    printf("'. Done: status = %d.\n%s\n", status, str);
     fflush(stdout);
 }

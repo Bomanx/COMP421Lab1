@@ -6,6 +6,7 @@
 #include <threads.h>
 
 #define MAX_ECHO_BUFFER_LENGTH 1024
+#define MAX_TERMINAL_BUFFER_LENGTH 1024
 #define MAX_WRITE_BUFFER_LENGTH 1024
 
 /*
@@ -27,6 +28,12 @@ static int writeItemsLeft[MAX_NUM_TERMINALS];
 static char writeBuffer[MAX_NUM_TERMINALS][MAX_WRITE_BUFFER_LENGTH];
 static int writeBufferLength[MAX_NUM_TERMINALS];
 static int writeBufferSpot[MAX_NUM_TERMINALS];
+
+static int terminalItemsLeft[MAX_NUM_TERMINALS];
+static int terminalItemsWrittenSoFar[MAX_NUM_TERMINALS];
+static char terminalBuffer[MAX_NUM_TERMINALS][MAX_ECHO_BUFFER_LENGTH];
+static int terminalBufferLength[MAX_NUM_TERMINALS];
+static int terminalBufferSpot[MAX_NUM_TERMINALS];
 
 /*
  * Output buflen chars from buf to screen, blocking until all characters
@@ -57,7 +64,7 @@ extern int WriteTerminal(int term, char *buf, int buflen) {
 		writeBufferSpot[term]++;
 		WriteDataRegister(term, reg_char);
 	}
-	return 0;
+	return buflen;
 }
 
 /*
@@ -70,7 +77,26 @@ extern int WriteTerminal(int term, char *buf, int buflen) {
  */
 extern int ReadTerminal(int term, char *buf, int buflen) {
 	Declare_Monitor_Entry_Procedure();
-	return -1;
+	printf("Reading terminal %d\n", term);
+	if (buflen > 0) {
+		// state[term] = READING;
+		terminalItemsWrittenSoFar[term] = 0;
+		while (1) {
+			char reg_char = 0;
+			if (terminalBufferSpot[term] < terminalBufferLength[term]) {
+				reg_char = terminalBuffer[term][terminalBufferSpot[term] % MAX_TERMINAL_BUFFER_LENGTH];
+				buf[terminalItemsWrittenSoFar[term]] = reg_char;
+				terminalBufferSpot[term]++;
+				terminalItemsWrittenSoFar[term]++;
+			}
+			if (terminalItemsWrittenSoFar[term] == buflen || reg_char == '\n') {
+				return terminalItemsWrittenSoFar[term];
+			}
+		}
+	}
+	else {
+		return -1;
+	}
 }
 
 /*
@@ -82,10 +108,17 @@ extern int ReadTerminal(int term, char *buf, int buflen) {
 int InitTerminal(int term) {	
 	echoBufferLength[term] = 0;
 	writeBufferLength[term] = 0;
+	terminalBufferLength[term] = 0;
+
+	terminalItemsLeft[term] = 0;
 	echoItemsLeft[term] = 0;
 	writeItemsLeft[term] = 0;
+	
 	echoBufferSpot[term] = 0;
 	writeBufferSpot[term] = 0;
+	terminalBufferSpot[term] = 0;
+    
+    terminalItemsWrittenSoFar[term] = 0;
     InitHardware(term);
 
 	return 0;
@@ -118,7 +151,6 @@ void TransmitInterrupt(int term) {
 	// Declare_Monitor_Entry_Procedure();
 	printf("TransmitInturrupt\n");
 	char reg_char = 0;
-	state[term] = SITTING;
 
 	if (echoItemsLeft[term] != 0) {
 		echoItemsLeft[term]--;
@@ -137,6 +169,9 @@ void TransmitInterrupt(int term) {
 		state[term] = WRITING;
 		WriteDataRegister(term, reg_char);
 	}
+	else {
+		state[term] = SITTING;
+	}
 		
 
 }
@@ -151,8 +186,13 @@ void ReceiveInterrupt(int term) {
 	printf("RecieveInturrupt %d\n", term);
 	char reg_char = ReadDataRegister(term);
 	echoBuffer[term][echoBufferLength[term] % MAX_ECHO_BUFFER_LENGTH] = reg_char;
+	terminalBuffer[term][terminalBufferLength[term] % MAX_TERMINAL_BUFFER_LENGTH] = reg_char;
+
 	echoItemsLeft[term]++;
+
 	echoBufferLength[term]++;
+	terminalBufferLength[term]++;
+	
 	if (state[term] == SITTING) {
 		state[term] = ECHOING;
 		echoItemsLeft[term]--;
