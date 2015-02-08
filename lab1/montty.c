@@ -85,9 +85,16 @@ extern int ReadTerminal(int term, char *buf, int buflen) {
 			char reg_char = 0;
 			if (terminalBufferSpot[term] < terminalBufferLength[term]) {
 				reg_char = terminalBuffer[term][terminalBufferSpot[term] % MAX_TERMINAL_BUFFER_LENGTH];
-				buf[terminalItemsWrittenSoFar[term]] = reg_char;
 				terminalBufferSpot[term]++;
-				terminalItemsWrittenSoFar[term]++;
+				if (reg_char == '\b') {
+					if (terminalItemsWrittenSoFar[term] > 0) {
+						terminalItemsWrittenSoFar[term]--;					
+					}
+				}
+				else {
+					buf[terminalItemsWrittenSoFar[term]] = reg_char;
+					terminalItemsWrittenSoFar[term]++;
+				}
 			}
 			if (terminalItemsWrittenSoFar[term] == buflen || reg_char == '\n') {
 				return terminalItemsWrittenSoFar[term];
@@ -193,6 +200,20 @@ void ReceiveInterrupt(int term) {
 	echoBufferLength[term]++;
 	terminalBufferLength[term]++;
 	
+	if (reg_char == '\r') {
+		echoBuffer[term][echoBufferLength[term] % MAX_ECHO_BUFFER_LENGTH] = '\n';
+		echoItemsLeft[term]++;
+		echoBufferLength[term]++;
+	}
+	if (reg_char == '\b' || reg_char == '\177') {
+		echoBuffer[term][echoBufferLength[term] % MAX_ECHO_BUFFER_LENGTH] = ' ';
+		echoItemsLeft[term]++;
+		echoBufferLength[term]++;
+		echoBuffer[term][echoBufferLength[term] % MAX_ECHO_BUFFER_LENGTH] = '\b';
+		echoItemsLeft[term]++;
+		echoBufferLength[term]++;
+	}
+
 	if (state[term] == SITTING) {
 		state[term] = ECHOING;
 		echoItemsLeft[term]--;
