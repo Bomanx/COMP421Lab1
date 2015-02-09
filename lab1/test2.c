@@ -23,13 +23,13 @@ int main(int argc, char **argv)
     if (argc > 2) HardwareInputSpeed(2, atoi(argv[2]));
 
 
-    while(1) {
-        // ThreadCreate(writer, NULL);
-        ThreadCreate(reader, NULL);
-        ThreadCreate(writer2, NULL);
-        // ThreadCreate(reader2, NULL);
+        while(1) {
+	  ThreadCreate(writer, NULL);
+	  ThreadCreate(reader, NULL);
+          ThreadCreate(writer2, NULL);
+	  ThreadCreate(reader2, NULL);
         sleep(3);
-    }
+	}
     ThreadWaitAll();
 
     exit(0);
@@ -40,12 +40,12 @@ writer(void *arg)
 {
     int status;
 
-    printf("Doing WriteTerminal... '");
+    //    printf("Doing WriteTerminal... '\n");
     fflush(stdout);
     status = WriteTerminal(1, string, length);
     char* str = malloc(3);
     // status = ReadTerminal(1, str,3);
-    printf("'. Done: status = %d.\n %s\n", status, str);
+    //printf("'. Done: status = %d.\n", status);
     fflush(stdout);
 }
 
@@ -66,11 +66,12 @@ reader(void *arg)
 {
     int status;
 
-    printf("Doing ReadTerminal... '");
+    //    printf("Doing ReadTerminal... '");
     fflush(stdout);
-    char* str = malloc(3);
-    status = ReadTerminal(1, str,3);
-    printf("'. Done: status = %d.\n %s\n", status, str);
+    char* str = malloc(100);
+    status = ReadTerminal(1, str,100);
+    printf("read1 %s\n", str);
+    free(str);
     fflush(stdout);
 }
 void
@@ -80,8 +81,8 @@ reader2(void *arg)
 
     printf("Doing ReadTerminal... '");
     fflush(stdout);
-    char* str = malloc(3);
-    status = ReadTerminal(2, str,3);
-    printf("'. Done: status = %d.\n%s\n", status, str);
+    char* str = malloc(100);
+    status = ReadTerminal(2, str,100);
+    printf("read2 %s\n", str);
     fflush(stdout);
 }

@@ -19,6 +19,8 @@ static int state[MAX_NUM_TERMINALS];
 #define	READING		1
 #define	WRITING		2
 #define ECHOING     3
+static int readingState[MAX_NUM_TERMINALS];
+#define NOT_READING 0
 
 static cond_id_t cond_var[MAX_NUM_TERMINALS];
 
@@ -45,7 +47,7 @@ static int terminalBufferSpot[MAX_NUM_TERMINALS];
  */
 extern int WriteTerminal(int term, char *buf, int buflen) {
 	Declare_Monitor_Entry_Procedure();
-	printf("Writing terminal %d\n", term);
+	//	printf("Writing terminal %d\n", term);
 	if (buflen + writeBufferLength[term] > MAX_WRITE_BUFFER_LENGTH) {
 		int amntTillEnd = MAX_WRITE_BUFFER_LENGTH - (writeBufferLength[term] % MAX_WRITE_BUFFER_LENGTH);
 		if (amntTillEnd == MAX_WRITE_BUFFER_LENGTH) {
@@ -67,12 +69,12 @@ extern int WriteTerminal(int term, char *buf, int buflen) {
 		writeBufferSpot[term]++;
 		WriteDataRegister(term, reg_char);
 	}
-	if (writeItemsLeft[term] == 0) {
+	//	if (writeItemsLeft[term] == 0) {
 		return buflen;
-	}
-	else {
-		CondWait(cond_var[term]);
-	}
+		//}
+		//else {
+       	 	//CondWait(cond_var[term]);
+		//	}
 }
 
 /*
@@ -87,12 +89,17 @@ extern int ReadTerminal(int term, char *buf, int buflen) {
 	Declare_Monitor_Entry_Procedure();
 	printf("Reading terminal %d\n", term);
 	if (buflen >= 0) {
-		// state[term] = READING;
+	  while(readingState[term] == READING) {
+	    CondWait(cond_var[term]);
+	  }
+	        readingState[term] = READING;
 		terminalItemsWrittenSoFar[term] = 0;
 		while (1) {
 			char reg_char = 0;
+			//		printf("Looping\n");
 			if (terminalBufferSpot[term] < terminalBufferLength[term]) {
-				reg_char = terminalBuffer[term][terminalBufferSpot[term] % MAX_TERMINAL_BUFFER_LENGTH];
+			  reg_char = terminalBuffer[term][terminalBufferSpot[term] % MAX_TERMINAL_BUFFER_LENGTH];
+			  // printf("reg_char %c\n", reg_char);
 				terminalBufferSpot[term]++;
 				if (reg_char == '\b') {
 					if (terminalItemsWrittenSoFar[term] > 0) {
@@ -101,14 +108,19 @@ extern int ReadTerminal(int term, char *buf, int buflen) {
 				}
 				else {
 					buf[terminalItemsWrittenSoFar[term]] = reg_char;
+					//printf("write %c\n", buf[terminalItemsWrittenSoFar[term]]);
 					terminalItemsWrittenSoFar[term]++;
+					
+					//		printf("num %d\n", terminalItemsWrittenSoFar[term]);
 				}
 			}
 			else {
 				CondWait(cond_var[term]);
 			}
-			if (terminalItemsWrittenSoFar[term] == buflen || reg_char == '\n') {
-				return terminalItemsWrittenSoFar[term];
+			if (terminalItemsWrittenSoFar[term] == buflen || reg_char == '\n' || reg_char == '\r') {
+			  //printf("This is running. terminalItems %d buflen %d reg_char %d\nstr:%s\n", terminalItemsWrittenSoFar[term], buflen, reg_char, buf);
+			  readingState[term] = NOT_READING;
+			  return terminalItemsWrittenSoFar[term];
 			}
 		}
 	}
@@ -140,7 +152,7 @@ int InitTerminal(int term) {
     InitHardware(term);
 
     cond_var[term] = CondCreate();
-
+    readingState[term] = NOT_READING;
 	return 0;
 }
 
@@ -169,7 +181,7 @@ int InitTerminalDriver(void) {
  */
 void TransmitInterrupt(int term) {
 	Declare_Monitor_Entry_Procedure();
-	printf("TransmitInturrupt\n");
+	//printf("TransmitInturrupt\n");
 	char reg_char = 0;
 
 	if (echoItemsLeft[term] != 0) {
@@ -204,7 +216,7 @@ void TransmitInterrupt(int term) {
  */
 void ReceiveInterrupt(int term) {
 	Declare_Monitor_Entry_Procedure();
-	printf("RecieveInturrupt %d\n", term);
+	//printf("RecieveInturrupt %d\n", term);
 	char reg_char = ReadDataRegister(term);
 	echoBuffer[term][echoBufferLength[term] % MAX_ECHO_BUFFER_LENGTH] = reg_char;
 	terminalBuffer[term][terminalBufferLength[term] % MAX_TERMINAL_BUFFER_LENGTH] = reg_char;
